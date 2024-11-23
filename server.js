@@ -1,8 +1,11 @@
+
 const express = require('express');
 const multer = require('multer');
 const libre = require('libreoffice-convert');
 const fs = require('fs');
 const path = require('path');
+const { Recipe } = require('muhammara');
+const uuid = require('uuid');  // Use uuid to generate unique temporary filenames
 
 const app = express();
 const upload = multer({ dest: 'uploads/' }); // Temporary folder to store uploaded files
@@ -12,12 +15,15 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Route to handle file upload and conversion
+// Route to handle file upload, conversion, and encryption
 app.post('/convert', upload.single('file'), (req, res) => {
     const filePath = req.file.path;
-    const outputPath = filePath + '.pdf';
+    const tempFileName = uuid.v4();  // Generate unique temp file name
+    const outputPath = path.join('uploads', `${tempFileName}.pdf`); // Output PDF path
+    const tmpOutputPath = path.join('uploads', `${tempFileName}.tmp.pdf`); // Temporary converted PDF path
+    const password = req.body.password; // Retrieve the password from the form
 
-    // Convert the file
+    // Convert DOCX to PDF
     const inputFile = fs.readFileSync(filePath);
     libre.convert(inputFile, '.pdf', undefined, (err, done) => {
         if (err) {
@@ -25,16 +31,38 @@ app.post('/convert', upload.single('file'), (req, res) => {
             return res.status(500).send('Conversion error');
         }
 
-        // Write the converted PDF file to disk
-        fs.writeFileSync(outputPath, done);
+        // Write the converted PDF to disk as a temporary file
+        fs.writeFileSync(tmpOutputPath, done);
 
-        // Send the file to the user
-        res.download(outputPath, 'converted.pdf', (err) => {
-            if (err) console.error(err);
+        // Encrypt the PDF with the provided password using Muhammara
+        const pdfDoc = new Recipe(tmpOutputPath, outputPath); // Create a new Recipe instance with input and output PDF paths
 
-            // Clean up files
-            fs.unlinkSync(filePath);
-            fs.unlinkSync(outputPath);
+        pdfDoc.encrypt({
+            userPassword: password, // Set the user password
+            ownerPassword: password, // Set the owner password
+            userProtectionFlag: 4, // Set the user protection flag (e.g., 4 to restrict modifications)
+        })
+        .endPDF(() => {
+            // Send the encrypted PDF to the user
+            res.download(outputPath, 'converted-encrypted.pdf', (err) => {
+                if (err) console.error(err);
+
+                // Delay the deletion of the temporary files to ensure all streams are closed
+                setTimeout(() => {
+                    // Clean up the original and temporary files after the download is complete
+                    fs.unlink(tmpOutputPath, (err) => {
+                        if (err) console.error(`Error deleting temporary file: ${err}`);
+                    });
+                    fs.unlink(filePath, (err) => {
+                        if (err) console.error(`Error deleting original uploaded file: ${err}`);
+                    });
+
+                    // Optionally, clean up the final output PDF as well
+                    fs.unlink(outputPath, (err) => {
+                        if (err) console.error(`Error deleting output file: ${err}`);
+                    });
+                }, 1000); // Delay by 1 second (you can adjust the time as needed)
+            });
         });
     });
 });
