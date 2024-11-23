@@ -3,7 +3,6 @@ const multer = require('multer');
 const libre = require('libreoffice-convert');
 const fs = require('fs');
 const path = require('path');
-const rimraf = require('rimraf');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' }); // Temporary folder to store uploaded files
