@@ -12,7 +12,7 @@
 - **Muhammara**: Node.js library used for encrypting PDF files with password protection.
 - **HTML/CSS/JavaScript**: Frontend technologies for creating an interactive user interface.
 - **File System (`fs` module)**: For managing file operations such as saving, renaming, and deleting files.
-- - **Generated **: Used to containerize the application and generate a Docker image for easy deployment across different environments.
+- **Docker**: Used to containerize the application and generate a Docker image for easy deployment across different environments.
 
 ---
 
